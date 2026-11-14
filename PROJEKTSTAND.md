@@ -64,6 +64,7 @@ Alle geplanten Patches (1.1, 1.2, B, C) sind umgesetzt und freigegeben. Neue Wü
 4. Optional: KI-Auswertung über die Claude API (braucht kleines Backend, API-Key nie im Frontend)
 
 ## Regeln für Claude
+- Bei jedem Update die Konstanten `APP_VERSION` und `APP_DATE` am Anfang des Skripts in `index.html` anpassen (steht klein ganz unten im Settings-Tab). Stand jetzt: 1.5
 - App-Name immer **Tracker4Life** verwenden
 - Antworten auf Deutsch, kurz und mobilfreundlich
 - Größere Wünsche in kleine Patches aufteilen, zuerst Vorschau im Chat, erst nach "Freigeben" die fertige index.html und den aktualisierten Projektstand liefern

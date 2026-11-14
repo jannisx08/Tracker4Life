@@ -224,6 +224,7 @@ label.ck:first-of-type{border-top:0}
   <div id="adm" class="hide"><label>Admin-Passwort</label><input type="password" id="adm-pw" autocomplete="off"><button class="full" id="adm-go">Entsperren</button><div class="note err" id="adm-msg"></div></div>
   <div id="met-box" class="hide"><div class="note">MET = Intensität einer Sportart, Du legst die Werte selbst fest. Rechnung: MET × Körpergewicht × Stunden. Körpergewicht = Durchschnitt der letzten bis zu 7 Tage mit Messung.</div><div id="met-list"></div></div>
  </div>
+ <div class="note" style="text-align:center;margin:4px 0 0">Version <span id="ver"></span></div>
 </section>
 
 <section id="tab-hist" class="hide">
@@ -257,6 +258,7 @@ label.ck:first-of-type{border-top:0}
 
 <script>
 const KEY = 'fortschrittstagebuch_v1';
+const APP_VERSION = '1.5', APP_DATE = '14.11.2026';
 let entries = [], weighings = [], meals = [], foods = [], exs = [], workouts = [], sessions = [], customs = [], active = null, tick = null;
 let energy = 0, act = 0, editId = null, editing = null, editEst = false, editDur = null;
 const $ = id => document.getElementById(id);
@@ -1105,6 +1107,7 @@ $('imp').onclick = () => $('file').click();
 $('file').onchange = e => e.target.files[0] && importData(e.target.files[0]);
 $('clear').onclick = () => twice($('clear'), () => { entries = []; weighings = []; meals = []; foods = []; exs = []; workouts = []; sessions = []; customs = []; active = null; persist(); renderList(); });
 $('f-date').value = today();
+$('ver').textContent = APP_VERSION + ' · ' + APP_DATE;
 buildEnergy(); load(); applySettings(); setTitle(); renderBanner(); autoBackupTick(); setInterval(autoBackupTick, 300000);
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); $('m-ts').value = nowLocal(); $('w-ts').value = nowLocal(); fillTypes(); updateForm(); buildAct(); $('m-day').value = today(); $('m-day').onchange = renderFood;
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
