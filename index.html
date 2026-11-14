@@ -108,6 +108,7 @@ label.ck:first-of-type{border-top:0}
 <div class="hdr"><h1 id="ttl">Tracker4Life</h1><button class="gear" id="gear" data-t="set" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></button></div>
 
 <section id="tab-new">
+ <div class="card hide" id="bk-banner"><div id="bk-text" class="meta" style="color:var(--tx)"></div><button class="full" id="bk-go" style="margin-top:10px">Jetzt exportieren</button></div>
  <div class="card">
   <h2>Eintrag für heute</h2>
   <label>Datum</label><input type="date" id="f-date">
@@ -199,7 +200,7 @@ label.ck:first-of-type{border-top:0}
   <div id="g-wonote"></div>
   <div id="g-ex"></div>
   <div class="card"><label>Übung hinzufügen oder neu anlegen</label>
-   <input id="g-addname" list="g-dl" placeholder="Name eintippen"><datalist id="g-dl"></datalist>
+   <input id="g-addname" list="g-dl" placeholder="Name eintippen" enterkeyhint="done" autocomplete="off"><datalist id="g-dl"></datalist>
    <div id="g-addwrap" class="hide"><label>Teile pro Satz (nur bei neuer Übung)</label><select id="g-addparts"><option value="1">1 (normal)</option><option value="2">2 Teile</option><option value="3">3 Teile</option></select></div>
    <button class="sec full" id="g-addbtn">Hinzufügen</button>
    <button class="full" id="g-end" style="background:var(--dn)">Training beenden</button></div>
@@ -213,10 +214,11 @@ label.ck:first-of-type{border-top:0}
   <label class="ck"><input type="checkbox" data-s="nSa"><div><b>Notiz pro Satz</b><span>Kurzer Kommentar zu einem Satz</span></div></label>
   <div class="note">Notizen vom letzten Training desselben Workouts werden beim nächsten Mal angezeigt.</div></div>
  <div class="card"><h2>Eingabe</h2>
-  <label class="ck"><input type="checkbox" data-s="range"><div><b>Wdh-Bereich</b><span>Zum Beispiel 8-9 statt 8 oder 9</span></div></label>
+  <label class="ck"><input type="checkbox" data-s="range"><div><b>Bereiche und Kombinationen</b><span>Bei Wdh und Gewicht z. B. 8-9 oder 10&amp;8 eintippen (Tastatur mit Zeichen)</span></div></label>
   <label class="ck"><input type="checkbox" data-s="parts"><div><b>Teile pro Satz</b><span>Mehrere Wdh/kg-Felder pro Satz (z. B. Bizeps Giant), einstellbar beim Anlegen oder Bearbeiten einer Übung</span></div></label></div>
  <div class="card"><h2>Weitere Funktionen</h2>
-  <label class="ck"><input type="checkbox" data-s="weight"><div><b>Gewichtstracking</b><span>Tab „Wiegen“ anzeigen</span></div></label></div>
+  <label class="ck"><input type="checkbox" data-s="weight"><div><b>Gewichtstracking</b><span>Tab „Wiegen“ anzeigen</span></div></label>
+  <label class="ck"><input type="checkbox" data-s="autoBackup"><div><b>Automatische Sicherung</b><span>Einmal pro Stunde, solange die App geöffnet wird. Liegt nur im Gerätespeicher und ist weg, wenn Du die App löschst.</span></div></label></div>
  <div class="card"><h2>Kalorienverbrauch 🔒</h2>
   <label class="ck"><input type="checkbox" data-s="kcal"><div><b>Kalorienverbrauch berechnen</b><span>Nur mit Admin-Passwort aktivierbar</span></div></label>
   <div id="adm" class="hide"><label>Admin-Passwort</label><input type="password" id="adm-pw" autocomplete="off"><button class="full" id="adm-go">Entsperren</button><div class="note err" id="adm-msg"></div></div>
@@ -229,6 +231,8 @@ label.ck:first-of-type{border-top:0}
  <div class="card">
   <h2>Daten</h2>
   <div class="row"><button class="sec" id="exp">Exportieren</button><button class="sec" id="imp">Importieren</button></div>
+  <div class="note" id="bak"></div>
+  <div class="row" style="margin-top:8px"><button class="sec" id="bak-now">Jetzt sichern</button><button class="sec" id="bak-res">Wiederherstellen</button></div>
   <input type="file" id="file" accept="application/json" class="hide">
   <button class="sec full" id="clear" style="color:var(--dn)">Alles löschen</button>
  </div>
@@ -402,11 +406,18 @@ function renderTips() {
 }
 
 // ---------- Export / Import ----------
-function exportData() {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({entries, weighings, meals, foods, exs, workouts, sessions, customs, settings}, null, 2)], {type: 'application/json'}));
-  const a = document.createElement('a'); a.href = url; a.download = 'tracker4life-' + today() + '.json'; a.click();
+async function exportData() {
+  const json = JSON.stringify({entries, weighings, meals, foods, exs, workouts, sessions, customs, settings}, null, 2), name = 'tracker4life-' + today() + '.json';
+  try {
+    const file = new File([json], name, {type: 'application/json'});
+    if (navigator.canShare && navigator.canShare({files: [file]})) { await navigator.share({files: [file], title: 'Tracker4Life Sicherung'}); markExport(); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const url = URL.createObjectURL(new Blob([json], {type: 'application/json'}));
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
+  markExport();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function markExport() { settings.lastExport = Date.now(); persist(); renderBackup(); renderBanner(); }
 function importData(file) {
   const r = new FileReader();
   r.onload = () => {
@@ -500,16 +511,16 @@ function renderGym() {
   $('g-idle').classList.toggle('hide', !!active); $('g-live').classList.toggle('hide', !active);
   if (active) { renderLive(); startTick(); return; }
   $('g-pick').innerHTML = '<option value="">Freies Training</option>' + workouts.map(w => `<option value="${w.id}">${esc(w.name)}</option>`).join('');
-  $('g-wlist').innerHTML = workouts.length ? workouts.map(w => isEd('wo', w.id) ? woEdit(w) : `<div class="entry" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px"><div style="flex:1 1 60%;min-width:0"><b>${esc(w.name)}</b>${woChips(w)}</div><span>${eBtn('wo', w.id)}<button class="del" data-wd="${w.id}">Löschen</button></span></div>`).join('') : '<div class="meta">Noch keine Workouts.</div>';
-  $('g-wex').innerHTML = exs.length ? exs.map(e => `<label style="display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--tx)"><input type="checkbox" value="${e.id}" style="width:auto">${esc(e.name)}</label>`).join('') : '<div class="meta">Lege unten zuerst Übungen an.</div>';
-  $('g-exlist').innerHTML = exs.map(e => isEd('ex', e.id) ? exEdit(e) : `<div class="entry"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b data-h="${esc(e.name)}" style="cursor:pointer">${esc(e.name)} ▾</b>${(e.parts || 1) > 1 ? `<span class="tag">${e.parts} Teile</span>` : ''}<span>${eBtn('ex', e.id)}<button class="del" data-ed="${e.id}">Löschen</button></span></div>${openH.has(e.name) ? histHtml(e.name, 10) : ''}</div>`).join('') || '<div class="meta">Noch keine Übungen.</div>';
+  $('g-wlist').innerHTML = workouts.length ? workouts.map(w => isEd('wo', w.id) ? woEdit(w) : `<div class="entry" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 8px"><div style="flex:1 1 60%;min-width:0"><b>${esc(w.name)}</b><div class="meta">${w.ex.length} Übung${w.ex.length === 1 ? '' : 'en'}</div></div><span>${eBtn('wo', w.id)}<button class="del" data-wd="${w.id}">Löschen</button></span></div>`).join('') : '<div class="meta">Noch keine Workouts.</div>';
+  $('g-wex').innerHTML = exs.length ? sortedEx().map(e => `<label style="display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--tx)"><input type="checkbox" value="${e.id}" style="width:auto">${esc(e.name)}</label>`).join('') : '<div class="meta">Lege unten zuerst Übungen an.</div>';
+  $('g-exlist').innerHTML = sortedEx().map(e => isEd('ex', e.id) ? exEdit(e) : `<div class="entry"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b data-h="${esc(e.name)}" style="cursor:pointer">${esc(e.name)} ▾</b>${(e.parts || 1) > 1 ? `<span class="tag">${e.parts} Teile</span>` : ''}<span>${eBtn('ex', e.id)}<button class="del" data-ed="${e.id}">Löschen</button></span></div>${openH.has(e.name) ? histHtml(e.name, 10) : ''}</div>`).join('') || '<div class="meta">Noch keine Übungen.</div>';
 }
 function renderLive() {
   active.done = active.done || []; active.exNotes = active.exNotes || {};
   $('g-title').textContent = active.name;
   $('g-pause').innerHTML = active.paused ? ICO_PLAY : ICO_PAUSE; $('g-pause').setAttribute('aria-label', active.paused ? 'Weiter' : 'Pause');
   $('g-ex').style.cssText = active.paused ? 'opacity:.5;pointer-events:none' : '';
-  $('g-dl').innerHTML = exs.map(e => `<option value="${esc(e.name)}">`).join('');
+  $('g-dl').innerHTML = sortedEx().map(e => `<option value="${esc(e.name)}">`).join('');
   $('g-wonote').innerHTML = settings.nWo ? `<div class="card">${active.prevNote ? `<div class="nt" style="margin-top:0">💬 Letztes Mal: ${esc(active.prevNote)}</div>` : ''}<input id="n-wo" placeholder="Notiz zum Workout" value="${esc(active.note || '')}"></div>` : '';
   $('g-ex').innerHTML = active.ex.map(id => {
     const name = exName(id), isDone = active.done.includes(id), open = !isDone || expD.has(id), cur = active.exNotes[name] || '';
@@ -521,7 +532,7 @@ function renderLive() {
     const np = (exs.find(e => e.id === id) || {}).parts || 1;
     const sets = active.sets.map((x, gi) => ({...x, gi})).filter(x => x.ex === id), last = sets[sets.length - 1];
     const prev = lastOf(name), pre = (prev && prev.sets[sets.length]) || last || (prev && prev.sets[prev.sets.length - 1]);
-    const inputs = [...Array(np)].map((_, i) => { const q = i === 0 ? pre : (pre && pre.more && pre.more[i - 1]); return `${np > 1 ? `<div class="meta" style="margin-top:8px">Teil ${i + 1}</div>` : ''}<div class="row" style="margin-top:4px"><div><label>Wiederholungen</label><input id="r-${id}-${i}" inputmode="${settings.range ? 'text' : 'numeric'}" value="${q ? esc(q.rt || q.reps) : ''}"></div><div><label>kg (optional)</label><input id="k-${id}-${i}" inputmode="decimal" value="${q && q.kg ? num2(q.kg) : ''}"></div></div>`; }).join('');
+    const inputs = [...Array(np)].map((_, i) => { const q = i === 0 ? pre : (pre && pre.more && pre.more[i - 1]); return `${np > 1 ? `<div class="meta" style="margin-top:8px">Teil ${i + 1}</div>` : ''}<div class="row" style="margin-top:4px"><div><label>Wiederholungen</label><input id="r-${id}-${i}" inputmode="${settings.range ? 'text' : 'numeric'}" value="${q ? esc(q.rt || q.reps) : ''}"></div><div><label>kg (optional)</label><input id="k-${id}-${i}" inputmode="${settings.range ? 'text' : 'decimal'}" value="${q && (q.kt || q.kg) ? esc(q.kt || num2(q.kg)) : ''}"></div></div>`; }).join('');
     const pv = (active.prevEx || {})[name];
     const exNote = settings.nEx ? (pv ? `<div class="nt">💬 Letztes Mal: ${esc(pv)}</div>` : '') + (openN.has(id) ? `<input id="n-ex-${id}" placeholder="Notiz zur Übung (nächstes Mal sichtbar)" value="${esc(cur)}" style="margin-bottom:6px">` : cur ? `<div class="nt">💬 ${esc(cur)}</div>` : '') : '';
     const rm = rmAsk === 'a:' + id
@@ -531,7 +542,7 @@ function renderLive() {
       (prev ? `<div class="meta" style="margin-bottom:6px">Letztes Mal (${fmtD(prev.ts)}): ${prev.sets.map(fs).join(' · ')}</div>` : '<div class="meta" style="margin-bottom:6px">Noch nie gemacht.</div>') +
       (openH.has(name) ? histHtml(name, 8) : '') +
       sets.map((x, i) => isEd('lset', x.gi) ? `<div class="entry">${lsetForm(x)}${eBar()}<button class="del" data-ldel="${x.gi}">Satz löschen</button></div>` : `<div class="srow" data-ek="lset" data-ei="${x.gi}"><span>Satz ${i + 1}: ${fs(x)}${x.rest != null ? ' · Pause ' + fmtS(x.rest) : ''}${x.note ? ' · 💬 ' + esc(x.note) : ''}</span><span class="pen">✎</span></div>`).join('') +
-      inputs + (settings.range ? '<div class="note">Bereich möglich, z. B. 8-9</div>' : '') +
+      inputs + (settings.range ? '<div class="note">Erlaubt: Zahlen, Komma, - und &amp; (z. B. 8-9 oder 10&amp;8)</div>' : '') +
       (settings.nSa ? `<label>Notiz zum Satz (optional)</label><input id="n-sa-${id}">` : '') +
       `<button class="full" data-set="${id}">Satz eintragen</button>${rm}</div>`;
   }).join('') || '<div class="card meta">Füge unten eine Übung hinzu.</div>';
@@ -562,11 +573,17 @@ function startTraining() {
 function logSet(id) {
   const np = (exs.find(e => e.id === id) || {}).parts || 1, n = Date.now();
   const first = parseReps($('r-' + id + '-0').value);
-  if (!first) return;
+  if (!first) { toast('Wiederholungen: nur Zahlen, z. B. 10 oder 8-9.'); return; }
+  const k0 = parseKg($('k-' + id + '-0').value);
+  if (k0 === undefined) { toast('Gewicht: nur Zahlen, z. B. 20, 22,5 oder 20-22.'); return; }
   const more = [];
-  for (let i = 1; i < np; i++) { const q = parseReps($('r-' + id + '-' + i).value); if (q) more.push({reps: q.reps, rt: q.rt, kg: pn($('k-' + id + '-' + i).value)}); }
+  for (let i = 1; i < np; i++) {
+    const q = parseReps($('r-' + id + '-' + i).value); if (!q) continue;
+    const kk = parseKg($('k-' + id + '-' + i).value); if (kk === undefined) { toast('Gewicht: nur Zahlen, z. B. 20, 22,5 oder 20-22.'); return; }
+    more.push({reps: q.reps, rt: q.rt, kg: kk.kg, kt: kk.kt});
+  }
   if (active.restStart && active.sets.length) active.sets[active.sets.length - 1].rest = Math.round((n - active.restStart) / 1000);
-  const st = {ex: id, reps: first.reps, rt: first.rt, kg: pn($('k-' + id + '-0').value), rest: null};
+  const st = {ex: id, reps: first.reps, rt: first.rt, kg: k0.kg, kt: k0.kt, rest: null};
   if (more.length) st.more = more;
   const nt = $('n-sa-' + id); if (nt && nt.value.trim()) st.note = nt.value.trim();
   active.sets.push(st);
@@ -575,7 +592,7 @@ function logSet(id) {
 function endTraining() {
   const n = active.paused || Date.now();
   if (active.restStart && active.sets.length) active.sets[active.sets.length - 1].rest = Math.round((n - active.restStart) / 1000);
-  if (active.sets.length) sessions.push({id: n, ts: nowLocal(), name: active.name, dur: Math.max(1, Math.round((n - active.start) / 60000)), woId: active.woId || null, note: (active.note || '').trim(), exNotes: cleanNotes(active.exNotes), sets: active.sets.map(x => ({ex: exName(x.ex), reps: x.reps, rt: x.rt || null, kg: x.kg, more: x.more, note: x.note, rest: x.rest}))});
+  if (active.sets.length) sessions.push({id: n, ts: nowLocal(), name: active.name, dur: Math.max(1, Math.round((n - active.start) / 60000)), woId: active.woId || null, note: (active.note || '').trim(), exNotes: cleanNotes(active.exNotes), sets: active.sets.map(x => ({ex: exName(x.ex), reps: x.reps, rt: x.rt || null, kg: x.kg, kt: x.kt || null, more: x.more, note: x.note, rest: x.rest}))});
   const day = sessions.length && active.sets.length ? sessions[sessions.length - 1].ts.slice(0, 10) : null;
   active = null; clearInterval(tick);
   const en = day ? autoGym(day) : null;
@@ -589,7 +606,7 @@ $('goto-gym').onclick = () => show('gym');
 $('g-start').onclick = startTraining;
 $('g-end').onclick = endTraining;
 $('g-pause').onclick = togglePause;
-$('g-exadd').onclick = () => { const n = $('g-exname').value.trim(); if (n) { getEx(n, +$('g-exparts').value); $('g-exname').value = ''; $('g-exparts').value = '1'; persist(); renderGym(); } };
+$('g-exadd').onclick = () => { const n = $('g-exname').value.trim(); if (n) { if (exs.some(x => x.name.toLowerCase() === n.toLowerCase())) { toast('„' + n + '“ gibt es schon.'); return; } getEx(n, +$('g-exparts').value); $('g-exname').value = ''; $('g-exparts').value = '1'; persist(); renderGym(); } };
 $('g-wadd').onclick = () => {
   const name = $('g-wname').value.trim(), ex = [...$('g-wex').querySelectorAll('input:checked')].map(c => +c.value);
   if (!name) return;
@@ -598,11 +615,18 @@ $('g-wadd').onclick = () => {
 $('g-wlist').onclick = e => { const b = e.target.closest('[data-wd]'); if (b) { workouts = workouts.filter(w => String(w.id) !== b.dataset.wd); persist(); renderGym(); } };
 $('g-exlist').onclick = e => { const b = e.target.closest('[data-ed]'); if (b) { const id = +b.dataset.ed; exs = exs.filter(x => x.id !== id); workouts.forEach(w => w.ex = w.ex.filter(x => x !== id)); persist(); renderGym(); } };
 $('g-ex').onclick = e => { const b = e.target.closest('[data-set]'); if (b) logSet(+b.dataset.set); };
-$('g-addbtn').onclick = () => {
-  const n = $('g-addname').value.trim(); if (!n) return;
-  const e = getEx(n, +$('g-addparts').value); if (!active.ex.includes(e.id)) active.ex.push(e.id);
-  $('g-addname').value = ''; $('g-addparts').value = '1'; persist(); renderLive();
-};
+function addToTraining() {
+  const n = $('g-addname').value.trim();
+  if (!n) { toast('Bitte einen Namen eintippen.'); return; }
+  const had = exs.some(x => x.name.toLowerCase() === n.toLowerCase()), e = getEx(n, +$('g-addparts').value);
+  $('g-addname').value = ''; $('g-addparts').value = '1';
+  if (active.ex.includes(e.id)) { persist(); toast('„' + e.name + '“ ist schon im Training.'); return; }
+  active.ex.push(e.id); persist(); renderLive();
+  toast('„' + e.name + '“ hinzugefügt' + (had ? '.' : ' und neu angelegt.'));
+  const cs = $('g-ex').children; if (cs.length) cs[cs.length - 1].scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+$('g-addbtn').onclick = addToTraining;
+$('g-addname').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addToTraining(); } };
 
 // ---------- Trainingsarten ----------
 const BASE = ['Kein Training', 'Gym', 'Fußballtraining', 'Spiel', 'Fahrrad fahren'];
@@ -666,7 +690,7 @@ function trainTag(e) {
 
 // ---------- Bearbeiten & Übungs-Historie ----------
 const openH = new Set();
-const fp = t => `${t.rt ? t.rt.replace('-', '–') : t.reps}${t.kg ? ' × ' + r1(t.kg) + ' kg' : ' Wdh'}`;
+const fp = t => `${t.rt ? fmtT(t.rt) : t.reps}${t.kt ? ' × ' + fmtT(t.kt) + ' kg' : t.kg ? ' × ' + r1(t.kg) + ' kg' : ' Wdh'}`;
 const fs = t => [t, ...(t.more || [])].map(fp).join(' + ');
 const fmtD = ts => new Date(ts).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'});
 const num2 = v => String(v ?? '').replace('.', ',');
@@ -678,7 +702,11 @@ const mealEdit = m => `<div class="entry">${eIn('name', 'Name', m.name, 'text')}
 const foodEdit = f => `<div class="entry">${eIn('name', 'Name', f.name, 'text')}${eIn('unit', 'Eine Einheit ist ...', f.unit, 'text')}<div class="row"><div>${eIn('kcal', 'kcal pro Einheit', num2(f.kcal))}</div><div>${eIn('prot', 'Protein (g) pro Einheit', num2(f.prot))}</div></div>${eBar()}</div>`;
 const weighEdit = w => `<div class="entry">${eIn('kg', 'Gewicht (kg)', num2(w.kg))}<label>Zeitpunkt</label><input type="datetime-local" id="e-ts" value="${w.ts}"><label>Vorher gegessen/getrunken?</label><select id="e-ate"><option value="0"${w.ate ? '' : ' selected'}>Nein, nüchtern</option><option value="1"${w.ate ? ' selected' : ''}>Ja</option></select>${eIn('what', 'Was? (nur bei Ja)', w.what, 'text')}${eBar()}</div>`;
 const exEdit = e => `<div class="entry">${eIn('name', 'Name der Übung', e.name, 'text')}${settings.parts ? `<label>Teile pro Satz</label><select id="e-parts">${[1, 2, 3].map(n => `<option value="${n}"${(e.parts || 1) === n ? ' selected' : ''}>${n}${n === 1 ? ' (normal)' : ''}</option>`).join('')}</select>` : ''}${eBar()}</div>`;
-const woEdit = w => `<div class="entry">${eIn('name', 'Name des Workouts', w.name, 'text')}<label>Übungen</label><div id="e-wex">${exs.map(e => `<label style="display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--tx)"><input type="checkbox" value="${e.id}" style="width:auto"${w.ex.includes(e.id) ? ' checked' : ''}>${esc(e.name)}</label>`).join('')}</div>${eBar()}</div>`;
+const woEdit = w => {
+  const inW = w.ex.filter(id => exs.some(e => e.id === id)), rest = sortedEx().filter(e => !w.ex.includes(e.id));
+  const row = (e, on) => `<label style="display:flex;gap:8px;align-items:center;margin:4px 0;color:var(--tx)"><input type="checkbox" value="${e.id}" style="width:auto"${on ? ' checked' : ''}>${esc(e.name)}</label>`;
+  return `<div class="entry">${eIn('name', 'Name des Workouts', w.name, 'text')}<label>Enthaltene Übungen (${inW.length}) · abwählen = entfernen</label><div id="e-wex">${inW.map(id => row(exs.find(e => e.id === id), true)).join('') || '<div class="meta">Noch keine.</div>'}</div>${rest.length ? `<label>Weitere Übungen hinzufügen (alphabetisch)</label><div id="e-wadd">${rest.map(e => row(e, false)).join('')}</div>` : ''}${eBar()}</div>`;
+};
 
 function lastOf(name) {
   for (let i = sessions.length - 1; i >= 0; i--) {
@@ -747,7 +775,8 @@ function saveEdit() {
   } else if (k === 'wo') {
     const w = by(workouts), n = v('name').trim();
     if (!n) return msg('Name nötig.');
-    w.name = n; w.ex = [...$('e-wex').querySelectorAll('input:checked')].map(c => +c.value);
+    const keep = [...$('e-wex').querySelectorAll('input:checked')].map(c => +c.value), add = $('e-wadd') ? [...$('e-wadd').querySelectorAll('input:checked')].map(c => +c.value) : [];
+    w.name = n; w.ex = [...keep, ...add];
   } else if (k === 'ses') {
     syncDraft();
     const d = editing.draft, x = by(sessions), sets = [];
@@ -755,13 +784,14 @@ function saveEdit() {
       if (t._d) continue;
       const parts = [t, ...(t.more || [])], out = [];
       for (let j = 0; j < parts.length; j++) {
-        const q = parts[j], raw = String(q._r !== undefined ? q._r : (q.rt || q.reps || '')).trim(), kg = q._k !== undefined ? pn(q._k) : (q.kg ?? null);
+        const q = parts[j], raw = String(q._r !== undefined ? q._r : (q.rt || q.reps || '')).trim(), kg = q._k !== undefined ? parseKg(q._k) : {kg: q.kg ?? null, kt: q.kt ?? null};
         if (!raw) { if (j === 0 && !t.nw) return msg('Wiederholungen müssen größer 0 sein.'); continue; }
-        const pr = parseReps(raw); if (!pr) return msg('Wiederholungen müssen größer 0 sein.');
-        out.push({reps: pr.reps, rt: pr.rt, kg});
+        const pr = parseReps(raw); if (!pr) return msg('Wiederholungen: nur Zahlen, z. B. 10 oder 8-9.');
+        if (kg === undefined) return msg('Gewicht: nur Zahlen, z. B. 20, 22,5 oder 20-22.');
+        out.push({reps: pr.reps, rt: pr.rt, kg: kg.kg, kt: kg.kt});
       }
       if (!out.length) continue;
-      const s0 = {ex: t.ex, reps: out[0].reps, rt: out[0].rt, kg: out[0].kg, rest: t.rest ?? null};
+      const s0 = {ex: t.ex, reps: out[0].reps, rt: out[0].rt, kg: out[0].kg, kt: out[0].kt, rest: t.rest ?? null};
       if (out.length > 1) s0.more = out.slice(1);
       const nt = (settings.nSa ? (t._n !== undefined ? t._n : (t.note || '')) : (t.note || '')).trim(); if (nt) s0.note = nt;
       sets.push(s0);
@@ -772,10 +802,12 @@ function saveEdit() {
     x.sets = sets;
     if (!sets.length) sessions = sessions.filter(o => o !== x); else autoGym(x.ts.slice(0, 10));
   } else if (k === 'lset') {
-    const t = active.sets[+id], a = parseReps(v('r'));
-    if (!a) return msg('Wiederholungen müssen größer 0 sein.');
-    t.reps = a.reps; t.rt = a.rt; t.kg = pn(v('k'));
-    (t.more || []).forEach((m, i) => { const b = parseReps(v('r' + (i + 1))); if (b) { m.reps = b.reps; m.rt = b.rt; } m.kg = pn(v('k' + (i + 1))); });
+    const t = active.sets[+id], a = parseReps(v('r')), k0 = parseKg(v('k'));
+    if (!a) return msg('Wiederholungen: nur Zahlen, z. B. 10 oder 8-9.');
+    const ks = (t.more || []).map((m, i) => parseKg(v('k' + (i + 1))));
+    if (k0 === undefined || ks.includes(undefined)) return msg('Gewicht: nur Zahlen, z. B. 20, 22,5 oder 20-22.');
+    t.reps = a.reps; t.rt = a.rt; t.kg = k0.kg; t.kt = k0.kt;
+    (t.more || []).forEach((m, i) => { const b = parseReps(v('r' + (i + 1))); if (b) { m.reps = b.reps; m.rt = b.rt; } m.kg = ks[i].kg; m.kt = ks[i].kt; });
     if (settings.nSa) t.note = v('note').trim();
   }
   editing = null; persist(); rerender(k);
@@ -854,16 +886,28 @@ function removeFromTraining(id) {
 }
 
 // ---------- Settings, Notizen, Hilfsfunktionen ----------
-let settings = {nWo: false, nEx: false, nSa: false, range: false, parts: false, weight: true, kcal: false, met: {}};
+let settings = {nWo: false, nEx: false, nSa: false, range: false, parts: false, weight: true, kcal: false, met: {}, autoBackup: true, lastExport: 0};
 let adminOK = false;
 const openN = new Set();
 const cleanNotes = o => { const r = {}; Object.keys(o || {}).forEach(k => { const t = String(o[k] || '').trim(); if (t) r[k] = t; }); return r; };
+const normT = s => String(s).replace(/\s+/g, '').replace(/[–—]/g, '-');
+const fmtT = t => String(t).replace(/-/g, '–').replace(/&/g, ' & ').replace(/\+/g, ' + ');
 function parseReps(s) {
   s = String(s ?? '').trim();
-  { const m = /^(\d+)\s*[-–]\s*(\d+)$/.exec(s); if (m) return {reps: +m[1], rt: m[1] + '-' + m[2]}; }
+  const t = normT(s);
+  if (/^\d+(?:[-+&]\d+)+$/.test(t)) return {reps: +/^\d+/.exec(t)[0], rt: t};
   const n = pn(s); return n && n >= 1 ? {reps: n, rt: null} : null;
 }
-const lsetForm = x => [x, ...(x.more || [])].map((q, i) => `<div class="row">${eIn('r' + (i || ''), i ? 'Wdh Teil ' + (i + 1) : 'Wdh', q.rt || q.reps, 'text')}${eIn('k' + (i || ''), 'kg', num2(q.kg))}</div>`).join('') + (settings.nSa ? eIn('note', 'Notiz', x.note, 'text') : '');
+function parseKg(s) {
+  s = String(s ?? '').trim(); if (!s) return {kg: null, kt: null};
+  const t = normT(s).replace(/\./g, ',');
+  if (/^\d+(?:,\d+)?(?:[-+&]\d+(?:,\d+)?)+$/.test(t)) return {kg: pn(/^\d+(?:,\d+)?/.exec(t)[0]), kt: t};
+  return /^\d+(?:[.,]\d+)?$/.test(s) ? {kg: pn(s), kt: null} : undefined;
+}
+const NUMF = /^(?:[rk]-\d+-\d+|e-[rk]\d*(?:_\d+)?)$/;
+document.addEventListener('input', e => { if (e.target.id && NUMF.test(e.target.id)) { const c = e.target.value.replace(/[^0-9.,\-–+&\s]/g, ''); if (c !== e.target.value) e.target.value = c; } });
+const sortedEx = () => [...exs].sort((a, b) => a.name.localeCompare(b.name, 'de', {sensitivity: 'base'}));
+const lsetForm = x => [x, ...(x.more || [])].map((q, i) => `<div class="row">${eIn('r' + (i || ''), i ? 'Wdh Teil ' + (i + 1) : 'Wdh', q.rt || q.reps, 'text')}${eIn('k' + (i || ''), 'kg', q.kt || num2(q.kg), 'text')}</div>`).join('') + (settings.nSa ? eIn('note', 'Notiz', x.note, 'text') : '');
 function twice(b, fn) {
   if (b.dataset.arm) { clearTimeout(+b.dataset.arm); delete b.dataset.arm; b.textContent = b.dataset.t; fn(); return; }
   b.dataset.t = b.textContent; b.textContent = 'Sicher?';
@@ -993,26 +1037,59 @@ function sesEditHtml(d) {
   return `<div class="entry">${eIn('name', 'Name', d.name, 'text')}${eIn('dur', 'Dauer (Min.)', d._dur ?? d.dur)}` + (settings.nWo ? eIn('note', 'Workout-Notiz', d.note, 'text') : '') +
     draftGroups(d).map(([n, idx], gi) => `<div class="card" style="margin:12px 0 0;padding:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b>${esc(n)}</b><button class="del" data-xr="${esc(n)}">Übung entfernen</button></div>` +
       (settings.nEx ? eIn('xn' + gi, 'Übungs-Notiz', d.exNotes[n], 'text') : '') +
-      idx.map((i, k) => { const t = d.sets[i]; return `<div class="meta" style="margin-top:10px">Satz ${k + 1}${t.nw ? ' (neu)' : ''}</div>` + [t, ...(t.more || [])].map((q, j) => `<div class="row" style="margin-top:4px"><input id="e-r${i}_${j}" inputmode="text" placeholder="Wdh${j ? ' Teil ' + (j + 1) : ''}" value="${esc(q._r ?? (q.rt || q.reps || ''))}"><input id="e-k${i}_${j}" inputmode="decimal" placeholder="kg" value="${esc(q._k ?? num2(q.kg))}"></div>`).join('') + (settings.nSa ? `<input id="e-n${i}" placeholder="Satz-Notiz" value="${esc(t._n ?? t.note ?? '')}" style="margin-top:6px">` : '') + `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="e-d${i}" style="width:auto"${t._d ? ' checked' : ''}>Satz löschen</label>`; }).join('') +
+      idx.map((i, k) => { const t = d.sets[i]; return `<div class="meta" style="margin-top:10px">Satz ${k + 1}${t.nw ? ' (neu)' : ''}</div>` + [t, ...(t.more || [])].map((q, j) => `<div class="row" style="margin-top:4px"><input id="e-r${i}_${j}" inputmode="text" placeholder="Wdh${j ? ' Teil ' + (j + 1) : ''}" value="${esc(q._r ?? (q.rt || q.reps || ''))}"><input id="e-k${i}_${j}" inputmode="decimal" placeholder="kg" value="${esc(q._k ?? (q.kt || num2(q.kg)))}"></div>`).join('') + (settings.nSa ? `<input id="e-n${i}" placeholder="Satz-Notiz" value="${esc(t._n ?? t.note ?? '')}" style="margin-top:6px">` : '') + `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="e-d${i}" style="width:auto"${t._d ? ' checked' : ''}>Satz löschen</label>`; }).join('') +
       `<button class="sec full" data-sa="${esc(n)}">＋ Satz</button></div>`).join('') +
-    `<datalist id="e-dl">${exs.map(o => `<option value="${esc(o.name)}">`).join('')}</datalist><label>Übung hinzufügen</label><input id="e-addex" list="e-dl" placeholder="Name eintippen"><button class="sec full" data-xa="1">＋ Übung hinzufügen</button>` + eBar() + '</div>';
+    `<datalist id="e-dl">${sortedEx().map(o => `<option value="${esc(o.name)}">`).join('')}</datalist><label>Übung hinzufügen</label><input id="e-addex" list="e-dl" placeholder="Name eintippen"><button class="sec full" data-xa="1">＋ Übung hinzufügen</button>` + eBar() + '</div>';
 }
 
 const ICO_PAUSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
 const ICO_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg>';
 
+// ---------- Automatische Sicherung ----------
+const BAK = KEY + '_bak';
+const isEmptyData = () => ![entries, weighings, meals, foods, exs, workouts, sessions].some(a => a.length);
+const backupInfo = () => { try { return JSON.parse(localStorage.getItem(BAK) || 'null'); } catch (e) { return null; } };
+function makeBackup(force) {
+  if ((!settings.autoBackup && !force) || isEmptyData()) return false;
+  try { localStorage.setItem(BAK, JSON.stringify({v: 1, ts: Date.now(), data: {entries, weighings, meals, foods, exs, workouts, sessions, customs, settings}})); }
+  catch (e) { toast('Sicherung nicht möglich (Speicher voll).'); return false; }
+  renderBackup(); return true;
+}
+function autoBackupTick() { const b = backupInfo(); if (!b || Date.now() - b.ts >= 3600000) makeBackup(); }
+function restoreBackup() {
+  const b = backupInfo(); if (!b || !b.data) { toast('Keine Sicherung vorhanden.'); return; }
+  const d = b.data;
+  entries = d.entries || []; weighings = d.weighings || []; meals = d.meals || []; foods = d.foods || []; exs = d.exs || []; workouts = d.workouts || []; sessions = d.sessions || []; customs = d.customs || [];
+  settings = {...settings, ...(d.settings || {})}; active = null;
+  persist(); applySettings(); renderList(); renderBackup(); toast('Sicherung wiederhergestellt.');
+}
+const fmtWhen = ts => { const d = new Date(ts), t = d.toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'}); return (d.toDateString() === new Date().toDateString() ? 'heute ' : d.toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'}) + ' ') + t + ' Uhr'; };
+function renderBanner() {
+  const le = settings.lastExport, days = le ? Math.floor((Date.now() - le) / 86400000) : null, due = !isEmptyData() && (!le || days >= 7);
+  $('bk-banner').classList.toggle('hide', !due);
+  if (due) $('bk-text').textContent = 'Deine Daten liegen nur auf diesem Handy und sind weg, wenn Du die App löschst. Letzte Datei-Sicherung: ' + (le ? 'vor ' + days + ' Tagen' : 'noch nie') + '. Exportiere sie jetzt und sichere die Datei in „Dateien“ oder iCloud Drive.';
+}
+function renderBackup() {
+  const b = backupInfo(), le = settings.lastExport, days = le ? Math.floor((Date.now() - le) / 86400000) : null;
+  $('bak').innerHTML = `Automatische Sicherung: ${settings.autoBackup ? 'an' : 'aus'} · zuletzt ${b ? fmtWhen(b.ts) : 'noch keine'}<br>` +
+    `<span${!le || days >= 7 ? ' class="err"' : ''}>Letzter Datei-Export: ${le ? 'vor ' + days + (days === 1 ? ' Tag' : ' Tagen') : 'noch nie'}${!le || days >= 7 ? ' – bitte exportieren und die Datei in „Dateien“ sichern' : ''}</span>`;
+}
+$('bak-now').onclick = () => toast(makeBackup(true) ? 'Gesichert.' : 'Nichts zu sichern.');
+$('bak-res').onclick = () => twice($('bak-res'), restoreBackup);
+
 // ---------- Navigation & Start ----------
 function setTitle() { $('ttl').textContent = new Date().toLocaleDateString('de-DE', {weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'}); }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) setTitle(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTitle(); autoBackupTick(); });
 function show(t) {
   setTitle();
   ['new','food','weigh','gym','hist','stats','set'].forEach(x => $('tab-' + x).classList.toggle('hide', x !== t));
   document.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  if (t === 'new') renderBanner();
   if (t === 'food') renderFood();
   if (t === 'weigh') renderWeigh();
   if (t === 'gym') renderGym();
   if (t === 'set') renderSettings();
-  if (t === 'hist') { renderList(); renderSessions(); }
+  if (t === 'hist') { renderList(); renderSessions(); renderBackup(); }
   if (t === 'stats') renderStats();
 }
 document.querySelector('nav').onclick = e => { const b = e.target.closest('button'); if (b) show(b.dataset.t); };
@@ -1023,11 +1100,13 @@ $('list').onclick = e => {
   const d = e.target.closest('[data-sd]'); if (d) twice(d, () => { sessions = sessions.filter(x => String(x.id) !== d.dataset.sd); persist(); renderList(); });
 };
 $('exp').onclick = exportData;
+$('bk-go').onclick = exportData;
 $('imp').onclick = () => $('file').click();
 $('file').onchange = e => e.target.files[0] && importData(e.target.files[0]);
 $('clear').onclick = () => twice($('clear'), () => { entries = []; weighings = []; meals = []; foods = []; exs = []; workouts = []; sessions = []; customs = []; active = null; persist(); renderList(); });
 $('f-date').value = today();
-buildEnergy(); load(); applySettings(); setTitle(); $('m-ts').value = nowLocal(); $('w-ts').value = nowLocal(); fillTypes(); updateForm(); buildAct(); $('m-day').value = today(); $('m-day').onchange = renderFood;
+buildEnergy(); load(); applySettings(); setTitle(); renderBanner(); autoBackupTick(); setInterval(autoBackupTick, 300000);
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); $('m-ts').value = nowLocal(); $('w-ts').value = nowLocal(); fillTypes(); updateForm(); buildAct(); $('m-day').value = today(); $('m-day').onchange = renderFood;
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>

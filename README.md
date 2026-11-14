@@ -37,7 +37,7 @@ Glas-Design mit weichen Farbverläufen im Hintergrund, halbdurchsichtigen Karten
 
 **Settings**
 - Notizen pro Workout, Übung und Satz einzeln aktivierbar, Notizen vom letzten Mal werden beim nächsten Training angezeigt
-- Wdh-Bereich (z. B. 8-9) und Teile pro Satz (mehrere Wdh/kg-Paare, z. B. Bizeps Giant)
+- Bereiche und Kombinationen bei Wdh und Gewicht (z. B. 8-9, 10&8) und Teile pro Satz (mehrere Wdh/kg-Paare, z. B. Bizeps Giant)
 - Gewichtstracking (Wiegen-Tab) ein- und ausblendbar
 
 **Kalorienverbrauch (optional, Settings, mit Admin-Passwort)**
@@ -47,7 +47,8 @@ Glas-Design mit weichen Farbverläufen im Hintergrund, halbdurchsichtigen Karten
 **Sonstiges**
 - Alles bearbeitbar und löschbar
 - Auswertung der letzten 7 Tage mit regelbasierten Erkenntnissen
-- Export und Import aller Daten als JSON-Datei
+- Export (über das Teilen-Menü) und Import aller Daten als JSON-Datei, Erinnerung zur Datei-Sicherung
+- Automatische stündliche Sicherung im Gerätespeicher mit Wiederherstellen
 
 ## Dateien
 
